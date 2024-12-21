@@ -1,0 +1,122 @@
+#define BLYNK_TEMPLATE_ID "TMPL6UzfUCqEG"
+#define BLYNK_TEMPLATE_NAME "puyz"
+#define BLYNK_AUTH_TOKEN "4aOT6AfvnRCMScpW7DONGdD9MnavZTRr"
+
+#include <BlynkSimpleEsp32.h>
+#include <IRremote.h>
+#include <WiFi.h>
+
+// Wi-Fi credentials
+char ssid[] = "PONDOK AN-NUR 2.4G"; 
+char pass[] = "teknik09";
+
+// Relay Pins
+#define RELAY1 27
+#define RELAY2 26
+#define RELAY3 33
+
+// IR Receiver Pin
+const int IR_RECEIVER_PIN = 15;
+
+// Kode IR untuk masing-masing relay
+const uint32_t RELAY1_TOGGLE_CODE = 0x17;
+const uint32_t RELAY2_TOGGLE_CODE = 0x16;
+const uint32_t RELAY3_TOGGLE_CODE = 0x15;
+
+// Relay States
+bool relay1State = false;
+bool relay2State = false;
+bool relay3State = false;
+
+unsigned long lastPressTime = 0;
+const unsigned long debounceDelay = 300;
+
+// Blynk Virtual Pins
+#define VPIN_RELAY1 V0
+#define VPIN_RELAY2 V1
+#define VPIN_RELAY3 V2
+
+// IR receiver instance
+IRrecv irrecv(IR_RECEIVER_PIN);
+decode_results results;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize Blynk
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  // Initialize IR receiver
+  IrReceiver.begin(IR_RECEIVER_PIN, ENABLE_LED_FEEDBACK);
+  Serial.println("IR receiver aktif");
+
+  // Set relay pins as output
+  pinMode(RELAY1, OUTPUT);
+  pinMode(RELAY2, OUTPUT);
+  pinMode(RELAY3, OUTPUT);
+
+  // Set default state
+  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY2, LOW);
+  digitalWrite(RELAY3, LOW);
+}
+
+// Handle Blynk Virtual Pins
+BLYNK_WRITE(VPIN_RELAY1) {
+  relay1State = param.asInt();
+  digitalWrite(RELAY1, relay1State ? HIGH : LOW);
+  Serial.println("Relay 1 dikontrol melalui Blynk: " + String(relay1State));
+}
+
+BLYNK_WRITE(VPIN_RELAY2) {
+  relay2State = param.asInt();
+  digitalWrite(RELAY2, relay2State ? HIGH : LOW);
+  Serial.println("Relay 2 dikontrol melalui Blynk: " + String(relay2State));
+}
+
+BLYNK_WRITE(VPIN_RELAY3) {
+  relay3State = param.asInt();
+  digitalWrite(RELAY3, relay3State ? HIGH : LOW);
+  Serial.println("Relay 3 dikontrol melalui Blynk: " + String(relay3State));
+}
+
+void updateBlynkStates() {
+  Blynk.virtualWrite(VPIN_RELAY1, relay1State);
+  Blynk.virtualWrite(VPIN_RELAY2, relay2State);
+  Blynk.virtualWrite(VPIN_RELAY3, relay3State);
+}
+
+void loop() {
+  Blynk.run();
+
+  // Cek apakah ada sinyal IR masuk
+  if (IrReceiver.decode()) {
+    Serial.print("Kode IR diterima: ");
+    Serial.println(IrReceiver.decodedIRData.command, HEX);
+    uint32_t receivedCode = IrReceiver.decodedIRData.command;
+
+    unsigned long currentTime = millis();
+    if (currentTime - lastPressTime > debounceDelay) {
+      if (receivedCode == RELAY1_TOGGLE_CODE) {
+        relay1State = !relay1State;
+        digitalWrite(RELAY1, relay1State ? HIGH : LOW);
+        Serial.println("Relay 1 diubah melalui IR remote");
+        Blynk.virtualWrite(VPIN_RELAY1, relay1State); // Update status ke Blynk
+      } else if (receivedCode == RELAY2_TOGGLE_CODE) {
+        relay2State = !relay2State;
+        digitalWrite(RELAY2, relay2State ? HIGH : LOW);
+        Serial.println("Relay 2 diubah melalui IR remote");
+        Blynk.virtualWrite(VPIN_RELAY2, relay2State); // Update status ke Blynk
+      } else if (receivedCode == RELAY3_TOGGLE_CODE) {
+        relay3State = !relay3State;
+        digitalWrite(RELAY3, relay3State ? HIGH : LOW);
+        Serial.println("Relay 3 diubah melalui IR remote");
+        Blynk.virtualWrite(VPIN_RELAY3, relay3State); // Update status ke Blynk
+      }
+      lastPressTime = currentTime;
+    }
+
+    // Bersihkan hasil IR
+    IrReceiver.resume();
+  }
+}
